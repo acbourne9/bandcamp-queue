@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Listening Queue</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap");
+:root{--bg:#0a0a0a;--surface:#111;--surface-hover:#1a1a1a;--border:#1e1e1e;--border-active:#333;--text:#e0e0e0;--text-dim:#666;--text-muted:#444;--accent:#c4a265;--accent-dim:rgba(196,162,101,.15)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-height:100vh}
+.app{max-width:680px;margin:0 auto;padding:40px 24px 120px}
+.header{margin-bottom:48px;padding-bottom:24px;border-bottom:1px solid var(--border)}
+.header-title{font-family:"Instrument Serif",serif;font-size:28px;font-weight:400;letter-spacing:-.02em;margin-bottom:8px}
+.header-meta{font-size:11px;color:var(--text-dim);letter-spacing:.05em;text-transform:uppercase}
+.header-meta span{color:var(--accent)}
+.stats-bar{display:flex;gap:24px;margin-bottom:32px;padding:16px 0;border-bottom:1px solid var(--border)}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat-value{font-size:20px;font-weight:500;font-family:"Instrument Serif",serif}
+.stat-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted)}
+.stat--accent .stat-value{color:var(--accent)}
+.stat--dim .stat-value{color:var(--text-dim)}
+.stat--success .stat-value{color:#6b9b7a}
+.progress-track{width:100%;height:2px;background:var(--border);margin-bottom:40px}
+.progress-fill{height:100%;background:var(--accent);transition:width .4s ease}
+.card{background:var(--surface);border:1px solid var(--border);padding:32px;margin-bottom:16px;opacity:0;transform:translateY(12px);animation:cardIn .35s ease forwards}
+@keyframes cardIn{to{opacity:1;transform:translateY(0)}}
+.card-position{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:20px}
+.card-top{display:flex;gap:24px;margin-bottom:24px}
+.card-art{width:140px;height:140px;flex-shrink:0;background:var(--bg);border:1px solid var(--border);overflow:hidden}
+.card-art img{width:100%;height:100%;object-fit:cover;display:block}
+.card-art-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:.1em}
+.card-info{display:flex;flex-direction:column;justify-content:center}
+.card-artist{font-family:"Instrument Serif",serif;font-size:24px;font-weight:400;margin-bottom:4px;letter-spacing:-.01em}
+.card-release{font-size:13px;color:var(--text-dim);margin-bottom:4px;font-style:italic}
+.card-label{font-size:11px;color:var(--text-muted);letter-spacing:.03em}
+.card-label a{color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);transition:color .2s,border-color .2s}
+.card-label a:hover{color:var(--text-dim);border-color:var(--text-dim)}
+.embed-container{margin-bottom:24px;border:1px solid var(--border);overflow:hidden}
+.embed-container iframe{width:100%;border:none;display:block}
+.embed-loading{display:flex;align-items:center;justify-content:center;height:120px;background:#000;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.1em}
+.embed-loading-dots::after{content:'';animation:dots 1.5s steps(4,end) infinite}
+@keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+.fallback-link{display:flex;align-items:center;justify-content:center;height:120px;background:#000;color:#c4a265;font-size:11px;text-transform:uppercase;letter-spacing:.1em;text-decoration:none}
+.actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.btn{font-family:"DM Mono",monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:14px 16px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;transition:all .15s ease;text-align:center}
+.btn:hover{background:var(--surface-hover);border-color:var(--border-active);color:var(--text)}
+.btn--want{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.btn--want:hover{background:rgba(196,162,101,.25)}
+.btn:disabled{opacity:.3;cursor:default}
+.btn-saving{color:var(--accent) !important;border-color:var(--accent) !important}
+.hints{display:flex;justify-content:center;gap:24px;margin-top:16px}
+.hint{font-size:9px;color:var(--text-muted);letter-spacing:.05em}
+.hint kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);font-family:"DM Mono",monospace;font-size:9px;margin-right:4px;color:var(--text-dim)}
+.results{display:none}.results.visible{display:block}
+.results-section{margin-bottom:40px}
+.results-section-title{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.results-item{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--border)}
+.results-item-artist{font-size:13px}.results-item-release{font-size:12px;color:var(--text-dim);font-style:italic}
+.results-item-label{font-size:10px;color:var(--text-muted)}
+.results-item a{font-size:10px;color:var(--accent);text-decoration:none;letter-spacing:.05em;text-transform:uppercase}
+.results-item a:hover{text-decoration:underline}
+.btn-secondary{font-family:"DM Mono",monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:14px 24px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;margin-top:8px}
+.complete-message{font-family:"Instrument Serif",serif;font-size:22px;margin-bottom:8px}
+.complete-sub{font-size:12px;color:var(--text-dim);margin-bottom:32px}
+.empty-state{text-align:center;padding:80px 0}
+.empty-state-title{font-family:"Instrument Serif",serif;font-size:22px;margin-bottom:8px}
+.empty-state-sub{font-size:12px;color:var(--text-dim)}
+.loading-state{text-align:center;padding:80px 0}
+.loading-state-title{font-family:"Instrument Serif",serif;font-size:22px;margin-bottom:8px}
+.loading-state-sub{font-size:12px;color:var(--text-dim)}
+.loading-dots::after{content:'';animation:dots 1.5s steps(4,end) infinite}
+.error-state{text-align:center;padding:80px 0}
+.error-state-title{font-family:"Instrument Serif",serif;font-size:22px;margin-bottom:8px;color:#c46565}
+.error-state-sub{font-size:12px;color:var(--text-dim);margin-bottom:24px}
+@media(max-width:480px){.app{padding:24px 16px 100px}.card{padding:24px 20px}.header-title{font-size:22px}.card-artist{font-size:20px}.card-top{flex-direction:column}.card-art{width:100%;height:200px}.stats-bar{gap:16px;flex-wrap:wrap}.actions{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="header-title">Listening Queue</div>
+    <div class="header-meta">Bandcamp releases &middot; <span id="date-display"></span></div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-value" id="stat-remaining">-</div><div class="stat-label">Remaining</div></div>
+    <div class="stat stat--accent"><div class="stat-value" id="stat-wanted">0</div><div class="stat-label">Wanted</div></div>
+    <div class="stat stat--dim"><div class="stat-value" id="stat-skipped">0</div><div class="stat-label">Skipped</div></div>
+    <div class="stat stat--success"><div class="stat-value" id="stat-later">0</div><div class="stat-label">Later</div></div>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+  <div id="card-container">
+    <div class="loading-state">
+      <div class="loading-state-title">Loading queue<span class="loading-dots"></span></div>
+      <div class="loading-state-sub">Fetching releases</div>
+    </div>
+  </div>
+  <div class="results" id="results"></div>
+</div>
+
+<script>
+(function() {
+  var API_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-queue";
+  var UPDATE_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-queue-update";
+  var EMBED_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-embed-id";
+
+  var QUEUE = [];
+  var currentIndex = 0;
+  var decisions = { want: [], skip: [], later: [] };
+  var saving = false;
+  var embedCache = {};
+
+  function init() {
+    document.getElementById("date-display").textContent = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    fetchQueue();
+    document.addEventListener("keydown", handleKeys);
+  }
+
+  function fetchQueue() {
+    fetch(API_URL)
+      .then(function(res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function(data) {
+        QUEUE = data.queue || [];
+        if (QUEUE.length === 0) {
+          document.getElementById("card-container").innerHTML = '<div class="empty-state"><div class="empty-state-title">Queue empty</div><div class="empty-state-sub">No queued releases. New Bandcamp emails will appear here automatically.</div></div>';
+          return;
+        }
+        updateStats();
+        showCard();
+      })
+      .catch(function(err) {
+        console.error("Failed to fetch queue:", err);
+        document.getElementById("card-container").innerHTML =
+          '<div class="error-state">' +
+          '<div class="error-state-title">Failed to load queue</div>' +
+          '<div class="error-state-sub">' + escHtml(err.message) + '</div>' +
+          '<button class="btn-secondary" onclick="location.reload()">Retry</button>' +
+          '</div>';
+      });
+  }
+
+  function updateStats() {
+    document.getElementById("stat-remaining").textContent = QUEUE.length - currentIndex;
+    document.getElementById("stat-wanted").textContent = decisions.want.length;
+    document.getElementById("stat-skipped").textContent = decisions.skip.length;
+    document.getElementById("stat-later").textContent = decisions.later.length;
+    document.getElementById("progress-fill").style.width = (currentIndex / QUEUE.length * 100) + "%";
+  }
+
+  function escHtml(s) {
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function showCard() {
+    var container = document.getElementById("card-container");
+    if (currentIndex >= QUEUE.length) { showResults(); return; }
+    var item = QUEUE[currentIndex];
+    var artHtml = item.cover_art
+      ? '<img src="' + escHtml(item.cover_art) + '" alt="">'
+      : '<div class="card-art-empty">No art</div>';
+
+    container.innerHTML = '<div class="card">' +
+      '<div class="card-position">Release ' + (currentIndex + 1) + ' of ' + QUEUE.length + '</div>' +
+      '<div class="card-top"><div class="card-art">' + artHtml + '</div><div class="card-info">' +
+      '<div class="card-artist">' + escHtml(item.artist) + '</div>' +
+      '<div class="card-release">' + escHtml(item.release) + '</div>' +
+      '<div class="card-label"><a href="' + item.url + '" target="_blank">' + escHtml(item.label) + ' &rarr;</a></div>' +
+      '</div></div>' +
+      '<div class="embed-container" id="embed-slot"><div class="embed-loading">Loading player<span class="embed-loading-dots"></span></div></div>' +
+      '<div class="actions" id="actions">' +
+      '<button class="btn btn--want" data-action="want">Wishlist</button>' +
+      '<button class="btn" data-action="later">Later</button>' +
+      '<button class="btn" data-action="skip">Skip</button>' +
+      '</div>' +
+      '<div class="hints"><span class="hint"><kbd>W</kbd> Wishlist</span><span class="hint"><kbd>L</kbd> Later</span><span class="hint"><kbd>S</kbd> Skip</span></div>' +
+      '</div>';
+
+    container.querySelectorAll("[data-action]").forEach(function(btn) {
+      btn.addEventListener("click", function() { decide(this.getAttribute("data-action")); });
+    });
+
+    // Fetch embed ID for current card
+    fetchEmbedId(item.url, currentIndex);
+
+    // Prefetch next card's embed ID so it's cached when we advance
+    if (currentIndex + 1 < QUEUE.length) {
+      fetchEmbedId(QUEUE[currentIndex + 1].url, currentIndex + 1);
+    }
+  }
+
+  function fetchEmbedId(url, forIndex) {
+    if (embedCache[url] !== undefined) {
+      if (forIndex === currentIndex) renderEmbed(embedCache[url], url);
+      return;
+    }
+
+    fetch(EMBED_URL + "?url=" + encodeURIComponent(url))
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        embedCache[url] = data.embed_id || "";
+        if (forIndex === currentIndex) renderEmbed(embedCache[url], url);
+      })
+      .catch(function() {
+        embedCache[url] = "";
+        if (forIndex === currentIndex) renderEmbed("", url);
+      });
+  }
+
+  function renderEmbed(embedId, url) {
+    var slot = document.getElementById("embed-slot");
+    if (!slot) return;
+    if (embedId) {
+      slot.innerHTML = '<iframe style="border:0;width:100%;height:241px" src="https://bandcamp.com/EmbeddedPlayer/album=' + embedId + '/size=large/bgcol=0a0a0a/linkcol=c4a265/artwork=small/transparent=true/" loading="lazy"></iframe>';
+    } else {
+      slot.innerHTML = '<a class="fallback-link" href="' + url + '" target="_blank">Open on Bandcamp &rarr;</a>';
+    }
+  }
+
+  function decide(action) {
+    if (saving) return;
+    saving = true;
+    var item = QUEUE[currentIndex];
+    var btns = document.querySelectorAll("#actions .btn");
+    btns.forEach(function(b) { b.disabled = true; });
+    var clicked = document.querySelector('[data-action="' + action + '"]');
+    if (clicked) { clicked.classList.add("btn-saving"); clicked.textContent = "Saving..."; }
+
+    var statusMap = { want: "wishlisted", skip: "skipped", later: "later" };
+    fetch(UPDATE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: item.url, status: statusMap[action] })
+    }).then(function() {
+      decisions[action].push(item);
+      currentIndex++;
+      saving = false;
+      updateStats();
+      showCard();
+    }).catch(function(err) {
+      console.error("Update failed:", err);
+      saving = false;
+      btns.forEach(function(b) { b.disabled = false; });
+      if (clicked) {
+        clicked.classList.remove("btn-saving");
+        clicked.textContent = action === "want" ? "Wishlist" : action.charAt(0).toUpperCase() + action.slice(1);
+      }
+    });
+  }
+
+  function handleKeys(e) {
+    if (currentIndex >= QUEUE.length || saving) return;
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    if (e.key === "w" || e.key === "W") decide("want");
+    if (e.key === "s" || e.key === "S") decide("skip");
+    if (e.key === "l" || e.key === "L") decide("later");
+  }
+
+  function showResults() {
+    document.getElementById("card-container").innerHTML = "";
+    var r = document.getElementById("results");
+    r.classList.add("visible");
+
+    function renderList(items, msg) {
+      if (!items.length) return '<div style="font-size:12px;color:#444;padding:12px 0">' + msg + '</div>';
+      return items.map(function(i) {
+        return '<div class="results-item"><div><div class="results-item-artist">' + escHtml(i.artist) +
+          ' <span class="results-item-release">- ' + escHtml(i.release) + '</span></div>' +
+          '<div class="results-item-label">' + escHtml(i.label) + '</div></div>' +
+          '<a href="' + i.url + '" target="_blank">Open</a></div>';
+      }).join("");
+    }
+
+    r.innerHTML = '<div class="complete-message">Queue complete</div>' +
+      '<div class="complete-sub">' + QUEUE.length + ' releases processed</div>' +
+      '<div class="results-section"><div class="results-section-title">Wishlisted (' + decisions.want.length + ')</div>' + renderList(decisions.want, "Nothing wishlisted") + '</div>' +
+      '<div class="results-section"><div class="results-section-title">Come back later (' + decisions.later.length + ')</div>' + renderList(decisions.later, "Nothing saved") + '</div>' +
+      '<div class="results-section"><div class="results-section-title">Skipped (' + decisions.skip.length + ')</div>' + renderList(decisions.skip, "Nothing skipped") + '</div>' +
+      '<button class="btn-secondary" id="reload-btn">Reload queue</button>';
+
+    document.getElementById("reload-btn").addEventListener("click", function() { location.reload(); });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
