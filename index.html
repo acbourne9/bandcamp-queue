@@ -26,11 +26,7 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
 .card{background:var(--surface);border:1px solid var(--border);padding:32px;margin-bottom:16px;opacity:0;transform:translateY(12px);animation:cardIn .35s ease forwards}
 @keyframes cardIn{to{opacity:1;transform:translateY(0)}}
 .card-position{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text-muted);margin-bottom:20px}
-.card-top{display:flex;gap:24px;margin-bottom:24px}
-.card-art{width:140px;height:140px;flex-shrink:0;background:var(--bg);border:1px solid var(--border);overflow:hidden}
-.card-art img{width:100%;height:100%;object-fit:cover;display:block}
-.card-art-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:.1em}
-.card-info{display:flex;flex-direction:column;justify-content:center}
+.card-info{margin-bottom:24px}
 .card-artist{font-family:"Instrument Serif",serif;font-size:24px;font-weight:400;margin-bottom:4px;letter-spacing:-.01em}
 .card-release{font-size:13px;color:var(--text-dim);margin-bottom:4px;font-style:italic}
 .card-label{font-size:11px;color:var(--text-muted);letter-spacing:.03em}
@@ -73,7 +69,7 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
 .error-state{text-align:center;padding:80px 0}
 .error-state-title{font-family:"Instrument Serif",serif;font-size:22px;margin-bottom:8px;color:#c46565}
 .error-state-sub{font-size:12px;color:var(--text-dim);margin-bottom:24px}
-@media(max-width:480px){.app{padding:24px 16px 100px}.card{padding:24px 20px}.header-title{font-size:22px}.card-artist{font-size:20px}.card-top{flex-direction:column}.card-art{width:100%;height:200px}.stats-bar{gap:16px;flex-wrap:wrap}.actions{grid-template-columns:1fr}}
+@media(max-width:480px){.app{padding:24px 16px 100px}.card{padding:24px 20px}.header-title{font-size:22px}.card-artist{font-size:20px}.stats-bar{gap:16px;flex-wrap:wrap}.actions{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -97,13 +93,11 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
   </div>
   <div class="results" id="results"></div>
 </div>
-
 <script>
 (function() {
   var API_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-queue";
   var UPDATE_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-queue-update";
   var EMBED_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-embed-id";
-
   var QUEUE = [];
   var currentIndex = 0;
   var decisions = { want: [], skip: [], later: [] };
@@ -160,17 +154,14 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
     var container = document.getElementById("card-container");
     if (currentIndex >= QUEUE.length) { showResults(); return; }
     var item = QUEUE[currentIndex];
-    var artHtml = item.cover_art
-      ? '<img src="' + escHtml(item.cover_art) + '" alt="">'
-      : '<div class="card-art-empty">No art</div>';
 
     container.innerHTML = '<div class="card">' +
       '<div class="card-position">Release ' + (currentIndex + 1) + ' of ' + QUEUE.length + '</div>' +
-      '<div class="card-top"><div class="card-art">' + artHtml + '</div><div class="card-info">' +
+      '<div class="card-info">' +
       '<div class="card-artist">' + escHtml(item.artist) + '</div>' +
       '<div class="card-release">' + escHtml(item.release) + '</div>' +
       '<div class="card-label"><a href="' + item.url + '" target="_blank">' + escHtml(item.label) + ' &rarr;</a></div>' +
-      '</div></div>' +
+      '</div>' +
       '<div class="embed-container" id="embed-slot"><div class="embed-loading">Loading player<span class="embed-loading-dots"></span></div></div>' +
       '<div class="actions" id="actions">' +
       '<button class="btn btn--want" data-action="want">Wishlist</button>' +
@@ -184,10 +175,7 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
       btn.addEventListener("click", function() { decide(this.getAttribute("data-action")); });
     });
 
-    // Fetch embed ID for current card
     fetchEmbedId(item.url, currentIndex);
-
-    // Prefetch next card's embed ID so it's cached when we advance
     if (currentIndex + 1 < QUEUE.length) {
       fetchEmbedId(QUEUE[currentIndex + 1].url, currentIndex + 1);
     }
@@ -198,7 +186,6 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
       if (forIndex === currentIndex) renderEmbed(embedCache[url], url);
       return;
     }
-
     fetch(EMBED_URL + "?url=" + encodeURIComponent(url))
       .then(function(res) { return res.json(); })
       .then(function(data) {
@@ -229,7 +216,6 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
     btns.forEach(function(b) { b.disabled = true; });
     var clicked = document.querySelector('[data-action="' + action + '"]');
     if (clicked) { clicked.classList.add("btn-saving"); clicked.textContent = "Saving..."; }
-
     var statusMap = { want: "wishlisted", skip: "skipped", later: "later" };
     fetch(UPDATE_URL, {
       method: "POST",
@@ -264,7 +250,6 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
     document.getElementById("card-container").innerHTML = "";
     var r = document.getElementById("results");
     r.classList.add("visible");
-
     function renderList(items, msg) {
       if (!items.length) return '<div style="font-size:12px;color:#444;padding:12px 0">' + msg + '</div>';
       return items.map(function(i) {
@@ -274,14 +259,12 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
           '<a href="' + i.url + '" target="_blank">Open</a></div>';
       }).join("");
     }
-
     r.innerHTML = '<div class="complete-message">Queue complete</div>' +
       '<div class="complete-sub">' + QUEUE.length + ' releases processed</div>' +
       '<div class="results-section"><div class="results-section-title">Wishlisted (' + decisions.want.length + ')</div>' + renderList(decisions.want, "Nothing wishlisted") + '</div>' +
       '<div class="results-section"><div class="results-section-title">Come back later (' + decisions.later.length + ')</div>' + renderList(decisions.later, "Nothing saved") + '</div>' +
       '<div class="results-section"><div class="results-section-title">Skipped (' + decisions.skip.length + ')</div>' + renderList(decisions.skip, "Nothing skipped") + '</div>' +
       '<button class="btn-secondary" id="reload-btn">Reload queue</button>';
-
     document.getElementById("reload-btn").addEventListener("click", function() { location.reload(); });
   }
 
