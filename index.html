@@ -11,7 +11,10 @@
 body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-height:100vh}
 .app{max-width:680px;margin:0 auto;padding:40px 24px 120px}
 .header{margin-bottom:48px;padding-bottom:24px;border-bottom:1px solid var(--border)}
-.header-title{font-family:"Instrument Serif",serif;font-size:28px;font-weight:400;letter-spacing:-.02em;margin-bottom:8px}
+.header-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.header-title{font-family:"Instrument Serif",serif;font-size:28px;font-weight:400;letter-spacing:-.02em}
+.header-nav a{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);padding-bottom:2px;transition:color .2s,border-color .2s}
+.header-nav a:hover{color:var(--accent);border-color:var(--accent)}
 .header-meta{font-size:11px;color:var(--text-dim);letter-spacing:.05em;text-transform:uppercase}
 .header-meta span{color:var(--accent)}
 .stats-bar{display:flex;gap:24px;margin-bottom:32px;padding:16px 0;border-bottom:1px solid var(--border)}
@@ -75,7 +78,10 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
 <body>
 <div class="app" id="app">
   <div class="header">
-    <div class="header-title">Listening Queue</div>
+    <div class="header-top">
+      <div class="header-title">Listening Queue</div>
+      <div class="header-nav"><a href="browse.html">Browse all</a></div>
+    </div>
     <div class="header-meta">Bandcamp releases &middot; <span id="date-display"></span></div>
   </div>
   <div class="stats-bar">

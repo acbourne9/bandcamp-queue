@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browse Queue</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap");
+:root{--bg:#0a0a0a;--surface:#111;--surface-hover:#1a1a1a;--border:#1e1e1e;--border-active:#333;--text:#e0e0e0;--text-dim:#666;--text-muted:#444;--accent:#c4a265;--accent-dim:rgba(196,162,101,.15);--success:#6b9b7a}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-height:100vh}
+.app{max-width:680px;margin:0 auto;padding:40px 24px 120px}
+.header{margin-bottom:48px;padding-bottom:24px;border-bottom:1px solid var(--border)}
+.header-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.header-title{font-family:"Instrument Serif",serif;font-size:28px;font-weight:400;letter-spacing:-.02em}
+.header-nav a{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);text-decoration:none;border-bottom:1px solid var(--border);padding-bottom:2px;transition:color .2s,border-color .2s}
+.header-nav a:hover{color:var(--accent);border-color:var(--accent)}
+.header-meta{font-size:11px;color:var(--text-dim);letter-spacing:.05em;text-transform:uppercase}
+.header-meta span{color:var(--accent)}
+.tabs{display:flex;gap:0;margin-bottom:32px;border-bottom:1px solid var(--border)}
+.tab{font-family:"DM Mono",monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:12px 16px;border:none;background:none;color:var(--text-muted);cursor:pointer;transition:color .15s;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab:hover{color:var(--text-dim)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab .tab-count{font-size:10px;color:var(--text-muted);margin-left:4px}
+.tab.active .tab-count{color:var(--accent)}
+.list-item{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);gap:12px}
+.list-item-info{flex:1;min-width:0}
+.list-item-artist{font-size:13px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-item-release{font-size:12px;color:var(--text-dim);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-item-label{font-size:10px;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-item-link{flex-shrink:0;font-size:10px;color:var(--accent);text-decoration:none;letter-spacing:.05em;text-transform:uppercase;padding:6px 0}
+.list-item-link:hover{text-decoration:underline}
+.empty-section{font-size:12px;color:var(--text-muted);padding:24px 0;text-align:center}
+.loading-state{text-align:center;padding:80px 0}
+.loading-state-title{font-family:"Instrument Serif",serif;font-size:22px;margin-bottom:8px}
+.loading-state-sub{font-size:12px;color:var(--text-dim)}
+.loading-dots::after{content:'';animation:dots 1.5s steps(4,end) infinite}
+@keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+.error-state{text-align:center;padding:80px 0}
+.error-state-title{font-family:"Instrument Serif",serif;font-size:22px;margin-bottom:8px;color:#c46565}
+.error-state-sub{font-size:12px;color:var(--text-dim);margin-bottom:24px}
+.btn-secondary{font-family:"DM Mono",monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:14px 24px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;margin-top:8px}
+@media(max-width:480px){.app{padding:24px 16px 100px}.header-title{font-size:22px}.tabs{overflow-x:auto}.tab{white-space:nowrap;padding:12px 12px}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="header-top">
+      <div class="header-title">Browse</div>
+      <div class="header-nav"><a href="index.html">&larr; Queue</a></div>
+    </div>
+    <div class="header-meta">All releases &middot; <span id="total-count">-</span> items</div>
+  </div>
+  <div id="tabs-container"></div>
+  <div id="list-container">
+    <div class="loading-state">
+      <div class="loading-state-title">Loading<span class="loading-dots"></span></div>
+      <div class="loading-state-sub">Fetching all releases</div>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  var BROWSE_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-queue-browse";
+  var allItems = [];
+  var grouped = {};
+  var activeTab = "wishlisted";
+  var tabOrder = ["wishlisted", "later", "queued", "skipped"];
+  var tabLabels = { wishlisted: "Wishlisted", later: "Later", queued: "Queued", skipped: "Skipped" };
+
+  function init() {
+    fetchAll();
+  }
+
+  function fetchAll() {
+    fetch(BROWSE_URL)
+      .then(function(res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function(data) {
+        allItems = data.items || [];
+        groupItems();
+        renderTabs();
+        renderList();
+        document.getElementById("total-count").textContent = allItems.length;
+      })
+      .catch(function(err) {
+        console.error("Failed to fetch:", err);
+        document.getElementById("list-container").innerHTML =
+          '<div class="error-state">' +
+          '<div class="error-state-title">Failed to load</div>' +
+          '<div class="error-state-sub">' + escHtml(err.message) + '</div>' +
+          '<button class="btn-secondary" onclick="location.reload()">Retry</button>' +
+          '</div>';
+      });
+  }
+
+  function groupItems() {
+    grouped = {};
+    tabOrder.forEach(function(s) { grouped[s] = []; });
+    allItems.forEach(function(item) {
+      var s = item.status || "queued";
+      if (!grouped[s]) grouped[s] = [];
+      grouped[s].push(item);
+    });
+  }
+
+  function escHtml(s) {
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function renderTabs() {
+    var container = document.getElementById("tabs-container");
+    var html = '<div class="tabs">';
+    tabOrder.forEach(function(key) {
+      var count = grouped[key] ? grouped[key].length : 0;
+      var cls = key === activeTab ? "tab active" : "tab";
+      html += '<button class="' + cls + '" data-tab="' + key + '">' + tabLabels[key] + '<span class="tab-count">(' + count + ')</span></button>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    container.querySelectorAll(".tab").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        activeTab = this.getAttribute("data-tab");
+        renderTabs();
+        renderList();
+      });
+    });
+  }
+
+  function renderList() {
+    var container = document.getElementById("list-container");
+    var items = grouped[activeTab] || [];
+    if (items.length === 0) {
+      container.innerHTML = '<div class="empty-section">No releases in this category</div>';
+      return;
+    }
+    var html = '';
+    items.forEach(function(item) {
+      html += '<div class="list-item">' +
+        '<div class="list-item-info">' +
+        '<div class="list-item-artist">' + escHtml(item.artist) + '</div>' +
+        '<div class="list-item-release">' + escHtml(item.release) + '</div>' +
+        '<div class="list-item-label">' + escHtml(item.label) + '</div>' +
+        '</div>' +
+        '<a class="list-item-link" href="' + item.url + '" target="_blank">Open</a>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
