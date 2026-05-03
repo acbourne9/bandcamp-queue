@@ -6,7 +6,7 @@
 <title>Browse Queue</title>
 <style>
 @import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap");
-:root{--bg:#0a0a0a;--surface:#111;--surface-hover:#1a1a1a;--border:#252220;--border-active:#3a3530;--text:#e0ddd8;--text-dim:#8a8580;--text-muted:#5c5650;--accent:#c4a265;--accent-dim:rgba(196,162,101,.15);--success:#7ba88a}
+:root{--bg:#0a0a0a;--surface:#111;--surface-hover:#1a1a1a;--border:#252220;--border-active:#3a3530;--text:#e0ddd8;--text-dim:#8a8580;--text-muted:#5c5650;--accent:#c4a265;--accent-dim:rgba(196,162,101,.15);--success:#7ba88a;--danger:#c46565}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-height:100vh}
 .app{max-width:680px;margin:0 auto;padding:40px 24px 120px}
@@ -24,6 +24,8 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
 .tab .tab-count{font-size:10px;color:var(--text-muted);margin-left:4px}
 .tab.active .tab-count{color:var(--accent)}
 .list-item{border-bottom:1px solid var(--border)}
+.list-item.is-updating{opacity:.5;pointer-events:none}
+.list-item.is-removed{display:none}
 .list-item-row{display:flex;justify-content:space-between;align-items:center;padding:14px 8px;gap:12px;cursor:pointer;transition:background .1s;-webkit-tap-highlight-color:rgba(196,162,101,.1)}
 .list-item-row:hover{background:var(--surface-hover)}
 .list-item.expanded .list-item-row{background:var(--surface);border-bottom:1px solid var(--border)}
@@ -31,10 +33,16 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
 .list-item-artist{font-size:13px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .list-item-release{font-size:12px;color:var(--text-dim);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .list-item-label{font-size:10px;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.list-item-actions{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.list-item-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .list-item-link{font-size:10px;color:var(--accent);text-decoration:none;letter-spacing:.05em;text-transform:uppercase;padding:6px 0}
 .list-item-link:hover{text-decoration:underline}
-.list-item-toggle{font-size:10px;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;transition:color .15s}
+.move-btn{font-family:"DM Mono",monospace;font-size:9px;text-transform:uppercase;letter-spacing:.06em;padding:5px 7px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s}
+.move-btn:hover{background:var(--surface-hover);color:var(--text);border-color:var(--border-active)}
+.move-btn[data-target="wishlisted"]:hover{color:var(--accent);border-color:var(--accent)}
+.move-btn[data-target="later"]:hover{color:var(--success);border-color:var(--success)}
+.move-btn[data-target="skipped"]:hover{color:var(--text);border-color:var(--border-active)}
+.move-btn[data-target="queued"]:hover{color:var(--text);border-color:var(--border-active)}
+.list-item-toggle{font-size:10px;color:var(--text-muted);letter-spacing:.05em;text-transform:uppercase;transition:color .15s;padding:0 4px}
 .list-item-row:hover .list-item-toggle{color:var(--text-dim)}
 .list-item.expanded .list-item-toggle{color:var(--accent)}
 .list-item-expand{display:none;padding:0 0 16px}
@@ -51,10 +59,22 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
 .loading-state-sub{font-size:12px;color:var(--text-dim)}
 .loading-dots::after{content:'';animation:dots 1.5s steps(4,end) infinite}
 .error-state{text-align:center;padding:80px 0}
-.error-state-title{font-family:"Instrument Serif",serif;font-size:22px;margin-bottom:8px;color:#c46565}
+.error-state-title{font-family:"Instrument Serif",serif;font-size:22px;margin-bottom:8px;color:var(--danger)}
 .error-state-sub{font-size:12px;color:var(--text-dim);margin-bottom:24px}
 .btn-secondary{font-family:"DM Mono",monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;padding:14px 24px;border:1px solid var(--border);background:var(--surface);color:var(--text-dim);cursor:pointer;margin-top:8px}
-@media(max-width:480px){.app{padding:24px 16px 100px}.header-title{font-size:22px}.tabs{overflow-x:auto}.tab{white-space:nowrap;padding:12px 12px}}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--surface);border:1px solid var(--border);padding:10px 16px;font-size:11px;letter-spacing:.05em;color:var(--text-dim);opacity:0;transition:transform .25s,opacity .25s;pointer-events:none;z-index:10}
+.toast.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{color:var(--danger);border-color:var(--danger)}
+@media(max-width:480px){
+  .app{padding:24px 16px 100px}
+  .header-title{font-size:22px}
+  .tabs{overflow-x:auto}
+  .tab{white-space:nowrap;padding:12px 12px}
+  .list-item-row{flex-wrap:wrap}
+  .list-item-info{flex-basis:100%}
+  .list-item-actions{flex-basis:100%;justify-content:flex-end;margin-top:6px;flex-wrap:wrap}
+  .move-btn{padding:5px 6px}
+}
 </style>
 </head>
 <body>
@@ -74,15 +94,18 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
     </div>
   </div>
 </div>
+<div class="toast" id="toast"></div>
 <script>
 (function() {
-  var BROWSE_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-queue-browse";
+  var QUEUE_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-queue";
+  var UPDATE_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-queue-update";
   var EMBED_URL = "https://adambourne.app.n8n.cloud/webhook/bandcamp-embed-id";
   var allItems = [];
   var grouped = {};
   var activeTab = "wishlisted";
   var tabOrder = ["wishlisted", "later", "queued", "skipped"];
   var tabLabels = { wishlisted: "Wishlisted", later: "Later", queued: "Queued", skipped: "Skipped" };
+  var moveLabels = { wishlisted: "Wish", later: "Later", skipped: "Skip", queued: "Queue" };
   var expandedUrl = null;
   var embedCache = {};
 
@@ -91,13 +114,16 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
   }
 
   function fetchAll() {
-    fetch(BROWSE_URL)
+    fetch(QUEUE_URL + "?status=all")
       .then(function(res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       })
       .then(function(data) {
-        allItems = data.items || [];
+        allItems = (data.queue || data.items || []).map(function(r) {
+          if (!r.status) r.status = "queued";
+          return r;
+        });
         groupItems();
         renderTabs();
         renderList();
@@ -126,7 +152,7 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
 
   function escHtml(s) {
     var d = document.createElement("div");
-    d.textContent = s;
+    d.textContent = s == null ? "" : String(s);
     return d.innerHTML;
   }
 
@@ -150,6 +176,15 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
     });
   }
 
+  function moveButtonsHtml(currentStatus) {
+    return ["wishlisted", "later", "skipped", "queued"]
+      .filter(function(s) { return s !== currentStatus; })
+      .map(function(s) {
+        return '<button class="move-btn" data-target="' + s + '">' + moveLabels[s] + '</button>';
+      })
+      .join("");
+  }
+
   function renderList() {
     var container = document.getElementById("list-container");
     var items = grouped[activeTab] || [];
@@ -162,6 +197,7 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
       var isExpanded = expandedUrl === item.url;
       var el = document.createElement("div");
       el.className = "list-item" + (isExpanded ? " expanded" : "");
+      el.setAttribute("data-url", item.url);
       el.innerHTML =
         '<div class="list-item-row">' +
           '<div class="list-item-info">' +
@@ -170,6 +206,7 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
             '<div class="list-item-label">' + escHtml(item.label) + '</div>' +
           '</div>' +
           '<div class="list-item-actions">' +
+            moveButtonsHtml(item.status) +
             '<a class="list-item-link" href="' + item.url + '" target="_blank" onclick="event.stopPropagation()">Open</a>' +
             '<span class="list-item-toggle">' + (isExpanded ? '&#9650;' : '&#9654;') + '</span>' +
           '</div>' +
@@ -180,8 +217,17 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
           '</div>' +
         '</div>';
 
-      el.querySelector(".list-item-row").addEventListener("click", function() {
+      el.querySelector(".list-item-row").addEventListener("click", function(e) {
+        // Don't expand if user clicked a move button or the open link
+        if (e.target.closest(".move-btn") || e.target.closest(".list-item-link")) return;
         toggleExpand(item.url, el);
+      });
+
+      el.querySelectorAll(".move-btn").forEach(function(btn) {
+        btn.addEventListener("click", function(e) {
+          e.stopPropagation();
+          moveTo(item, this.getAttribute("data-target"));
+        });
       });
 
       container.appendChild(el);
@@ -201,7 +247,6 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
       return;
     }
 
-    // Collapse previous
     var prev = document.querySelector(".list-item.expanded");
     if (prev) {
       prev.classList.remove("expanded");
@@ -209,7 +254,6 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
       prev.querySelector(".embed-container").innerHTML = '';
     }
 
-    // Expand new
     expandedUrl = url;
     clickedEl.classList.add("expanded");
     clickedEl.querySelector(".list-item-toggle").innerHTML = '&#9650;';
@@ -246,6 +290,56 @@ body{background:var(--bg);color:var(--text);font-family:"DM Mono",monospace;min-
     } else {
       container.innerHTML = '<a class="fallback-link" href="' + url + '" target="_blank">Open on Bandcamp &rarr;</a>';
     }
+  }
+
+  function moveTo(item, newStatus) {
+    if (!item || item.status === newStatus) return;
+    var prevStatus = item.status;
+    var rowEl = document.querySelector('.list-item[data-url="' + cssEscape(item.url) + '"]');
+    if (rowEl) rowEl.classList.add("is-updating");
+
+    item.status = newStatus;
+
+    fetch(UPDATE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: item.url, status: newStatus })
+    }).then(function(res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      // Re-group + update tab counts
+      groupItems();
+      renderTabs();
+      // If item moved out of current tab, hide it. Otherwise re-render the row.
+      if (newStatus !== activeTab) {
+        if (rowEl) rowEl.classList.add("is-removed");
+        // After a moment, remove from DOM so empty-state can show if needed
+        setTimeout(function() {
+          if ((grouped[activeTab] || []).length === 0) renderList();
+        }, 300);
+      } else {
+        renderList();
+      }
+      showToast("Moved to " + newStatus);
+    }).catch(function(err) {
+      item.status = prevStatus;
+      if (rowEl) rowEl.classList.remove("is-updating");
+      showToast("Update failed: " + err.message, true);
+    });
+  }
+
+  function cssEscape(s) {
+    if (window.CSS && CSS.escape) return CSS.escape(s);
+    return String(s).replace(/(["\\])/g, "\\$1");
+  }
+
+  var toastTimer;
+  function showToast(msg, isError) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.toggle("error", !!isError);
+    t.classList.add("visible");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { t.classList.remove("visible"); }, 2200);
   }
 
   init();
